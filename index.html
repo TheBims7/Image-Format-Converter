@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Converter Format Gambar</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- JSZip untuk kompresi -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- jsPDF untuk membuat PDF valid -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-layer-group"></i> Image Format Converter</h1>
+        <div class="subtitle">
+            <i class="fas fa-arrows-spin fa-spin" style="margin-right: 8px;"></i>
+            Mengkonversi format pada gambar <strong>dalam berbagai pilihan format gambar</strong>.
+        </div>
+
+        <div class="upload-area" id="uploadArea">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p>Klik atau Seret Gambar</p>
+            <small>JPG, PNG, WEBP, BMP, GIF, TIFF, ICO, AVIF, PDF (output)</small>
+            <input type="file" id="fileInput" accept="image/*" multiple>
+        </div>
+
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <label>
+                    <i class="fas fa-arrow-right-arrow-left"></i> Format
+                    <select id="formatSelect">
+                        <option value="webp">WEBP</option>
+                        <option value="png">PNG</option>
+                        <option value="jpg">JPG / JPEG</option>
+                        <option value="avif">AVIF</option>
+                        <option value="pdf">PDF</option>
+                        <option value="bmp">BMP</option>
+                        <option value="ico">ICO</option>
+                        <option value="tiff">TIFF</option>
+                        <option value="gif">GIF</option>
+                    </select>
+                </label>
+                <div class="quality-group">
+                    <i class="fas fa-sliders-h" style="color: #2a7faa;"></i>
+                    <input type="range" id="qualityRange" min="10" max="100" value="90">
+                    <span class="quality-value" id="qualityValue">90%</span>
+                </div>
+            </div>
+            <div class="toolbar-right">
+                <button class="btn btn-primary" id="convertAllBtn"><i class="fas fa-wand-magic-sparkles"></i> Konversi Semua</button>
+                <button class="btn btn-success" id="saveAllBtn" disabled><i class="fas fa-download"></i> Save All</button>
+                <button class="btn btn-danger" id="clearAllBtn"><i class="fas fa-trash-can"></i> Hapus Semua</button>
+            </div>
+        </div>
+
+        <div class="gallery-grid" id="galleryGrid">
+            <div class="empty-state">
+                <i class="fas fa-images" style="font-size: 2.2rem; color: #b6d4e6; margin-bottom: 8px; display: block;"></i>
+                Belum ada gambar. Upload file untuk memulai.
+            </div>
+        </div>
+
+        <div class="footer-credit">
+            <i class="fas fa-shield-alt"></i> Semua pemrosesan di lokal — gambar tidak pernah dikirim ke server
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
