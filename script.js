@@ -127,13 +127,20 @@
     }
 
     function addFiles(files) {
-        const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+        // Terima file gambar DAN PDF
+        const validFiles = Array.from(files).filter(f => {
+            return f.type.startsWith('image/') || 
+                   f.type === 'application/pdf' || 
+                   f.name.toLowerCase().endsWith('.pdf');
+        });
+        
         if (validFiles.length === 0) {
             alert('Tidak ada file gambar yang valid.');
             return;
         }
 
         for (const file of validFiles) {
+            console.log('File ditambahkan:', file.name, file.type); 
             const id = idCounter++;
             const item = {
                 id,
@@ -145,8 +152,47 @@
                 convertedName: '',
                 status: 'waiting',
                 error: null,
+                isPdf: file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
             };
 
+            // KALAU PDF → langsung render tanpa preview gambar
+            if (item.isPdf) {
+                // Buat preview icon PDF
+                const canvas = document.createElement('canvas');
+                canvas.width = 200;
+                canvas.height = 200;
+                const ctx = canvas.getContext('2d');
+                
+                // Background putih
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, 200, 200);
+                
+                // Icon PDF
+                ctx.fillStyle = '#e74c3c';
+                ctx.font = 'bold 80px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('PDF', 100, 100);
+                
+                ctx.fillStyle = '#333';
+                ctx.font = '20px Arial';
+                ctx.fillText('📄', 100, 150);
+                
+                // Simpan sebagai image dummy
+                const img = new Image();
+                img.onload = () => {
+                    item.originalImage = img;
+                    renderGallery();
+                };
+                img.src = canvas.toDataURL('image/png');
+                
+                // Tampilkan di gallery
+                imageItems.push(item);  //
+                renderGallery();
+                continue;
+            }
+
+            // KALAU GAMBAR → load seperti biasa
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
@@ -174,7 +220,7 @@
     }
 
     // --- Konversi ---
-    async function convertAll() {
+     async function convertAll() {
         if (isConverting) return;
         if (imageItems.length === 0) {
             alert('Tidak ada gambar.');
@@ -209,6 +255,76 @@
 
         for (const item of imageItems) {
             if (item.status === 'done' || item.status === 'error') continue;
+            
+            // CEK APAKAH FILE PDF
+            const isPdfInput = item.file && (item.file.type === 'application/pdf' || 
+                               item.file.name.toLowerCase().endsWith('.pdf'));
+
+            // KALAU INPUT PDF TAPI TARGET BUKAN PDF → PAKAI PDF.js
+            if (isPdfInput && targetFormat !== 'pdf') {
+                try {
+                    if (typeof pdfjsLib === 'undefined') {
+                        throw new Error('Library PDF.js tidak ditemukan.');
+                    }
+
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+                    const arrayBuffer = await item.file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    const page = await pdf.getPage(1);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                    let blob = await new Promise((resolve) => {
+                        canvas.toBlob((b) => resolve(b), mimeType, quality);
+                    });
+
+                    if (!blob) {
+                        item.status = 'error';
+                        item.error = 'Gagal konversi PDF ke gambar';
+                    } else {
+                        const baseName = item.file.name.replace(/\.[^.]+$/, '') || 'file';
+                        const newName = `${baseName}.${ext}`;
+                        item.convertedBlob = blob;
+                        item.convertedName = newName;
+                        item.status = 'done';
+                        item.error = null;
+                    }
+                } catch (err) {
+                    console.error('Error konversi PDF:', err);
+                    item.status = 'error';
+                    item.error = err.message || 'Error konversi PDF';
+                }
+                renderGallery();
+                continue;
+            }
+
+            // KALAU INPUT PDF TARGET PDF → COPY
+            if (isPdfInput && targetFormat === 'pdf') {
+                try {
+                    const blob = await item.file.arrayBuffer().then(buf => new Blob([buf], { type: 'application/pdf' }));
+                    const baseName = item.file.name.replace(/\.[^.]+$/, '') || 'file';
+                    const newName = `${baseName}.pdf`;
+                    item.convertedBlob = blob;
+                    item.convertedName = newName;
+                    item.status = 'done';
+                    item.error = null;
+                } catch (err) {
+                    console.error('Error copy PDF:', err);
+                    item.status = 'error';
+                    item.error = err.message || 'Error copy PDF';
+                }
+                renderGallery();
+                continue;
+            }
+
+            // KALAU INPUT GAMBAR (LANJUTKAN SEPERTI BIASA)
             if (!item.originalImage) {
                 item.status = 'error';
                 item.error = 'Gambar tidak siap';
@@ -287,7 +403,7 @@
         convertAllBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Konversi Semua';
         renderGallery();
     }
-
+    
     // --- Save All dengan logika: 1-3 langsung, >3 ZIP ---
     function saveAll() {
         const doneItems = imageItems.filter(it => it.convertedBlob && it.status === 'done');
