@@ -266,25 +266,79 @@
                     if (typeof pdfjsLib === 'undefined') {
                         throw new Error('Library PDF.js tidak ditemukan.');
                     }
-
+            
                     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
+            
                     const arrayBuffer = await item.file.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                    const page = await pdf.getPage(1);
-                    const viewport = page.getViewport({ scale: 1.5 });
                     
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-                    
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-
-                    let blob = await new Promise((resolve) => {
-                        canvas.toBlob((b) => resolve(b), mimeType, quality);
-                    });
-
+                    const totalPages = pdf.numPages;  // ✅ Dapatkan total halaman
+                    console.log('Total halaman PDF:', totalPages);
+            
+                    // Buat array untuk menyimpan semua blob
+                    const pageBlobs = [];
+            
+                    // Loop semua halaman
+                    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                        const page = await pdf.getPage(pageNum);
+                        const viewport = page.getViewport({ scale: 1.5 });
+                        
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+            
+                        // Konversi halaman ke blob
+                        const pageBlob = await new Promise((resolve) => {
+                            canvas.toBlob((b) => resolve(b), mimeType, quality);
+                        });
+            
+                        if (pageBlob) {
+                            pageBlobs.push(pageBlob);
+                        }
+                    }
+            
+                    // Gabungkan semua halaman jadi satu ZIP atau multiple file
+                    if (pageBlobs.length === 0) {
+                        throw new Error('Tidak ada halaman yang berhasil dikonversi');
+                    }
+            
+                    // Jika hanya 1 halaman, langsung jadi blob
+                    if (pageBlobs.length === 1) {
+                        blob = pageBlobs[0];
+                    } else {
+                        // Jika banyak halaman, gabung jadi ZIP
+                        if (typeof JSZip === 'undefined') {
+                            // Fallback: ambil halaman pertama aja
+                            console.warn('JSZip tidak ditemukan, hanya ambil halaman pertama');
+                            blob = pageBlobs[0];
+                        } else {
+                            const zip = new JSZip();
+                            const folderName = item.file.name.replace(/\.[^.]+$/, '') || 'pdf_pages';
+                            const folder = zip.folder(folderName);
+            
+                            pageBlobs.forEach((pageBlob, index) => {
+                                const pageNum = index + 1;
+                                const fileName = `${folderName}_page_${pageNum}.${ext}`;
+                                folder.file(fileName, pageBlob);
+                            });
+            
+                            const zipBlob = await zip.generateAsync({ type: 'blob' });
+                            
+                            // Simpan ZIP sebagai hasil
+                            const baseName = item.file.name.replace(/\.[^.]+$/, '') || 'pdf_pages';
+                            const newName = `${baseName}_all_pages.zip`;
+                            item.convertedBlob = zipBlob;
+                            item.convertedName = newName;
+                            item.status = 'done';
+                            item.error = null;
+                            renderGallery();
+                            continue;  // Skip ke item berikutnya
+                        }
+                    }
+            
                     if (!blob) {
                         item.status = 'error';
                         item.error = 'Gagal konversi PDF ke gambar';
